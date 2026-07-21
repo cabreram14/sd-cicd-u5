@@ -6,19 +6,23 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ccabreram1/sd-cicd-u5
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
-      - name: Instalar dependencias (build reproducible)
+      - name: Instalar dependencias
         run: npm ci
 
       - name: Ejecutar pruebas
@@ -27,24 +31,33 @@ jobs:
   build-push:
     needs: build-test
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Login en GitHub Container Registry
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Iniciar sesión en GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build y push de la imagen (build once, promote many)
-        uses: docker/build-push-action@v5
+      - name: Construir y publicar imagen
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+            APP_COLOR=blue
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
